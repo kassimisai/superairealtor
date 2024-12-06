@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Ready Set Realtor RDS Infrastructure'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where RDS will be deployed
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet::Id
+    Description: First private subnet ID for RDS
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Second private subnet ID for RDS
+
+  DBName:
+    Type: String
+    Description: Database name
+    Default: ready_set_realtor
+
+  DBUsername:
+    Type: String
+    Description: Database admin username
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+
+  DBPassword:
+    Type: String
+    Description: Database admin password
+    MinLength: 8
+    NoEcho: true
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS instance
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS instance
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          Description: Allow PostgreSQL access from ECS tasks
+          SourceSecurityGroupId: !Ref ECSSecurityGroup
+
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ECS tasks
+      VpcId: !Ref VpcId
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: 14.7
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp2
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      MonitoringInterval: 60
+      PreferredBackupWindow: 03:00-04:00
+      PreferredMaintenanceWindow: Mon:04:00-Mon:05:00
+
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: postgres14
+      Description: Custom parameter group for Ready Set Realtor
+      Parameters:
+        max_connections: 100
+        shared_buffers: '{DBInstanceClassMemory/32768}MB'
+        effective_cache_size: '{DBInstanceClassMemory/16384}MB'
+        maintenance_work_mem: '64MB'
+        checkpoint_completion_target: '0.9'
+        wal_buffers: '16MB'
+        default_statistics_target: '100'
+        random_page_cost: '1.1'
+        effective_io_concurrency: '200'
+        work_mem: '4MB'
+        min_wal_size: '1GB'
+        max_wal_size: '4GB'
+
+Outputs:
+  DBEndpoint:
+    Description: Database endpoint
+    Value: !GetAtt DBInstance.Endpoint.Address
+
+  DBPort:
+    Description: Database port
+    Value: !GetAtt DBInstance.Endpoint.Port
+
+  DBSecurityGroupId:
+    Description: Security group ID for RDS
+    Value: !Ref DBSecurityGroup
+
+  ECSSecurityGroupId:
+    Description: Security group ID for ECS tasks
+    Value: !Ref ECSSecurityGroup 

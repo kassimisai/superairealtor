@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ready_set_realtor
+      - SECRET_KEY=your_secret_key_here
+      - ENVIRONMENT=development
+      - VAPI_API_KEY=your_vapi_api_key_here
+      - TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+      - TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+      - TWILIO_PHONE_NUMBER=your_twilio_phone_number_here
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+
+  db:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ready_set_realtor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data: 
